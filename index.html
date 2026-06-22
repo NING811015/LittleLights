@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Little Lights</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            background-color: #0F172A;
+            background-image: url('https://images.unsplash.com/photo-1519681393784-d120267933ba?auto=format&fit=crop&w=1920&q=80');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: #F8FAFC;
+        }
+        .glass-card {
+            background-color: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .note-content {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        textarea {
+            resize: none;
+            background: transparent;
+            color: #F8FAFC;
+        }
+        textarea:focus {
+            outline: none;
+        }
+        /* 隱藏捲軸但保留捲動功能 */
+        textarea::-webkit-scrollbar {
+            display: none;
+        }
+        textarea {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="overlayMsg" class="fixed top-10 left-1/2 transform -translate-x-1/2 opacity-0 transition-opacity duration-300 pointer-events-none z-50 text-sm font-light tracking-widest text-[#FBBF24]"></div>
+
+    <div id="homeView" class="w-full max-w-[640px] flex flex-col gap-6 transition-opacity duration-500">
+        
+        <div class="text-center space-y-2 mb-4">
+            <div class="text-3xl">🌙</div>
+            <h1 class="text-xl font-light tracking-widest">Little Lights</h1>
+        </div>
+
+        <div class="glass-card rounded-2xl p-6 shadow-2xl">
+            <textarea id="noteInput" class="w-full min-h-[220px] text-lg font-light leading-relaxed placeholder-transparent" maxlength="1000"></textarea>
+        </div>
+
+        <div class="flex flex-col gap-4">
+            <button id="submitBtn" class="h-[56px] w-full glass-card rounded-xl font-medium tracking-widest hover:bg-slate-800/80 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                📮 投遞
+            </button>
+            <button id="drawModeBtn" class="h-[56px] w-full text-sm font-light tracking-widest hover:text-[#FBBF24] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                ✨ 抽一張
+            </button>
+        </div>
+    </div>
+
+    <div id="drawView" class="hidden w-full max-w-[640px] flex flex-col gap-6 transition-opacity duration-500 opacity-0">
+        
+        <div class="glass-card rounded-2xl p-8 shadow-2xl min-h-[300px] flex flex-col relative">
+            <div id="noteDate" class="text-xs text-slate-400 font-light tracking-widest mb-6"></div>
+            <div id="noteContentText" class="note-content text-lg font-light leading-relaxed flex-grow"></div>
+        </div>
+
+        <div class="flex flex-col gap-4">
+            <button id="redrawBtn" class="h-[56px] w-full glass-card rounded-xl font-medium tracking-widest hover:bg-slate-800/80 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-[#FBBF24]">
+                ✨ 再抽一張
+            </button>
+            <button id="returnBtn" class="h-[56px] w-full text-sm font-light tracking-widest hover:text-slate-300 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                ← 回到星空
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 配置區
+        // ==========================================
+        const API_URL = "https://script.google.com/macros/s/AKfycby4b7SArfEO8XJXcffd5ILP7L1vtk5nhlj3j8Nup-VoIYqHKcYu8Lr2M5xSWDOC5A/exec";
+        const SUCCESS_MESSAGES = ["已收好", "收到", "放進去了", "存好了", "留下了"];
+
+        // ==========================================
+        // DOM 元素
+        // ==========================================
+        const homeView = document.getElementById('homeView');
+        const drawView = document.getElementById('drawView');
+        const noteInput = document.getElementById('noteInput');
+        const submitBtn = document.getElementById('submitBtn');
+        const drawModeBtn = document.getElementById('drawModeBtn');
+        
+        const noteDate = document.getElementById('noteDate');
+        const noteContentText = document.getElementById('noteContentText');
+        const redrawBtn = document.getElementById('redrawBtn');
+        const returnBtn = document.getElementById('returnBtn');
+        const overlayMsg = document.getElementById('overlayMsg');
+
+        // ==========================================
+        // 狀態管理
+        // ==========================================
+        let currentDrawId = "";
+        let isProcessing = false;
+
+        // ==========================================
+        // 輔助函數
+        // ==========================================
+        function showMessage(text, duration = 2000) {
+            overlayMsg.innerText = text;
+            overlayMsg.classList.remove('opacity-0');
+            setTimeout(() => {
+                overlayMsg.classList.add('opacity-0');
+            }, duration);
+        }
+
+        function setButtonState(btn, isLoading, originalText) {
+            if (isLoading) {
+                btn.disabled = true;
+                btn.innerHTML = `<svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                btn.classList.add('opacity-70', 'cursor-not-allowed');
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }
+
+        function switchView(target) {
+            if (target === 'draw') {
+                homeView.classList.add('opacity-0');
+                setTimeout(() => {
+                    homeView.classList.add('hidden');
+                    drawView.classList.remove('hidden');
+                    // 觸發重繪以啟用過渡動畫
+                    void drawView.offsetWidth;
+                    drawView.classList.remove('opacity-0');
+                }, 500);
+            } else {
+                drawView.classList.add('opacity-0');
+                setTimeout(() => {
+                    drawView.classList.add('hidden');
+                    homeView.classList.remove('hidden');
+                    void homeView.offsetWidth;
+                    homeView.classList.remove('opacity-0');
+                }, 500);
+            }
+        }
+
+        // ==========================================
+        // 核心邏輯：API 請求
+        // ==========================================
+        async function apiRequest(payload) {
+            try {
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(payload),
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+                });
+                return await response.json();
+            } catch (error) {
+                console.error('API Error:', error);
+                throw error;
+            }
+        }
+
+        // ==========================================
+        // 事件綁定
+        // ==========================================
+        
+        // 1. 投遞紙條
+        submitBtn.addEventListener('click', async () => {
+            const content = noteInput.value.trim();
+            if (!content) return;
+            if (isProcessing) return;
+
+            isProcessing = true;
+            setButtonState(submitBtn, true, "");
+
+            try {
+                const res = await apiRequest({ action: "add", content: content });
+                if (res.success) {
+                    noteInput.value = '';
+                    const randomMsg = SUCCESS_MESSAGES[Math.floor(Math.random() * SUCCESS_MESSAGES.length)];
+                    showMessage(randomMsg);
+                }
+            } catch (error) {
+                showMessage("網路異常，請稍後重試");
+            } finally {
+                isProcessing = false;
+                setButtonState(submitBtn, false, "📮 投遞");
+            }
+        });
+
+        // 2. 進入抽卡頁 & 呼叫抽卡 API
+        async function executeDraw(btnElement, originalText) {
+            if (isProcessing) return;
+            isProcessing = true;
+            setButtonState(btnElement, true, "");
+
+            try {
+                const res = await apiRequest({ action: "draw", exclude_id: currentDrawId });
+                
+                // 更新畫面資料
+                currentDrawId = res.id;
+                noteDate.innerText = res.date;
+                noteContentText.innerText = res.content;
+
+                // 若在首頁則切換視圖
+                if (!drawView.classList.contains('opacity-0') === false) {
+                    switchView('draw');
+                }
+            } catch (error) {
+                showMessage("星光微弱，請稍後重試");
+            } finally {
+                isProcessing = false;
+                setButtonState(btnElement, false, originalText);
+            }
+        }
+
+        drawModeBtn.addEventListener('click', () => executeDraw(drawModeBtn, "✨ 抽一張"));
+        redrawBtn.addEventListener('click', () => executeDraw(redrawBtn, "✨ 再抽一張"));
+
+        // 3. 返回首頁
+        returnBtn.addEventListener('click', () => {
+            currentDrawId = ""; // 重置 ID 狀態
+            noteInput.value = '';
+            switchView('home');
+        });
+
+    </script>
+</body>
+</html>
