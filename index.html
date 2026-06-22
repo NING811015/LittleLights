@@ -56,7 +56,7 @@ url('./background.png');
 </head>
 <body class="min-h-screen flex flex-col items-center justify-start pt-12 p-5">
 
-    <div id="overlayMsg" class="fixed top-12 left-1/2 transform -translate-x-1/2 opacity-0 transition-opacity duration-300 pointer-events-none z-50 text-sm font-light tracking-widest text-[#FBBF24] drop-shadow-md"></div>
+    
 
     <div id="homeView" class="w-full max-w-[640px] flex flex-col gap-6 transition-opacity duration-500 z-10">
         
@@ -124,7 +124,6 @@ url('./background.png');
         const noteContentText = document.getElementById('noteContentText');
         const redrawBtn = document.getElementById('redrawBtn');
         const returnBtn = document.getElementById('returnBtn');
-        const overlayMsg = document.getElementById('overlayMsg');
 
         // ==========================================
         // 狀態管理
@@ -136,12 +135,17 @@ url('./background.png');
         // 輔助函數
         // ==========================================
         function showMessage(text, duration = 2000) {
-            overlayMsg.innerText = text;
-            overlayMsg.classList.remove('opacity-0');
-            setTimeout(() => {
-                overlayMsg.classList.add('opacity-0');
-            }, duration);
-        }
+
+    const originalContent = submitBtn.innerHTML;
+
+    submitBtn.innerHTML = text;
+    submitBtn.disabled = true;
+
+    setTimeout(() => {
+        submitBtn.innerHTML = originalContent;
+        submitBtn.disabled = false;
+    }, duration);
+}
 
         function setButtonState(btn, isLoading, originalHTML) {
             if (isLoading) {
@@ -211,7 +215,7 @@ url('./background.png');
                 if (res.success) {
                     noteInput.value = '';
                     const randomMsg = SUCCESS_MESSAGES[Math.floor(Math.random() * SUCCESS_MESSAGES.length)];
-                    showMessage(randomMsg);
+                    showMessage("已收好");
                 }
             } catch (error) {
                 showMessage("網路異常，請稍後重試");
