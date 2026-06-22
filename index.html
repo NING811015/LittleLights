@@ -110,6 +110,7 @@ url('./background.png');
         // ==========================================
         const API_URL = "https://script.google.com/macros/s/AKfycby4b7SArfEO8XJXcffd5ILP7L1vtk5nhlj3j8Nup-VoIYqHKcYu8Lr2M5xSWDOC5A/exec";
         const SUCCESS_MESSAGES = ["已收到", "放進去了", "存好了", "留下了"];
+        const SUBMIT_BUTTON_HTML ='<span class="text-[#FBBF24] text-xs">✨</span> 投遞';
 
         // ==========================================
         // DOM 元素
@@ -134,18 +135,7 @@ url('./background.png');
         // ==========================================
         // 輔助函數
         // ==========================================
-        function showMessage(text, duration = 2000) {
-
-    const originalContent = submitBtn.innerHTML;
-
-    submitBtn.innerHTML = text;
-    submitBtn.disabled = true;
-
-    setTimeout(() => {
-        submitBtn.innerHTML = originalContent;
-        submitBtn.disabled = false;
-    }, duration);
-}
+        
 
         function setButtonState(btn, isLoading, originalHTML) {
             if (isLoading) {
@@ -213,16 +203,22 @@ url('./background.png');
             try {
                 const res = await apiRequest({ action: "add", content: content });
                 if (res.success) {
-                    noteInput.value = '';
-                    const randomMsg = SUCCESS_MESSAGES[Math.floor(Math.random() * SUCCESS_MESSAGES.length)];
-                    showMessage("已收好");
-                }
+
+    noteInput.value = '';
+
+    submitBtn.innerHTML = "已收好";
+
+    setTimeout(() => {
+        submitBtn.innerHTML = SUBMIT_BUTTON_HTML;
+    }, 2000);
+
+}
             } catch (error) {
-                showMessage("網路異常，請稍後重試");
+                alert("網路異常，請稍後重試");
             } finally {
-                isProcessing = false;
-                setButtonState(submitBtn, false, originalHTML);
-            }
+    isProcessing = false;
+    submitBtn.disabled = false;
+}
         });
 
         // 2. 進入抽卡頁 & 呼叫抽卡 API
@@ -250,7 +246,7 @@ noteContentText.innerText = res.content;
                     switchView('draw');
                 }
             } catch (error) {
-                showMessage("星光微弱，請稍後重試");
+                alert("星光微弱，請稍後重試");
             } finally {
                 isProcessing = false;
                 setButtonState(btnElement, false, originalHTML);
